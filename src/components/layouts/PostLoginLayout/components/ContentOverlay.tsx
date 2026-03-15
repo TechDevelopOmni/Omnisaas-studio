@@ -19,8 +19,8 @@ const ContentOverlay = ({ children }: CommonProps) => {
     return (
         <LayoutBase
             type={LAYOUT_CONTENT_OVERLAY}
-            className="app-layout-content-overlay flex flex-auto flex-col min-h-screen"
-            pageContainerReassemble={({
+            className="app-layout-content-overlay flex flex-auto flex-col min-h-screen bg-[radial-gradient(125%_125%_at_50%_100%,_#000000_40%,_#010133_100%)]"
+            pageContainerReassemble={({ 
                 children,
                 defaultClass,
                 header,

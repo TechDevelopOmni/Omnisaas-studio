@@ -101,3 +101,9 @@
 		@apply text-gray-900 dark:text-gray-100;
 	}
 }
+
+@layer utilities {
+	.dark\:bg-gray-900:is(.dark *) {
+		background-color: #0f172aa3;
+	}
+}

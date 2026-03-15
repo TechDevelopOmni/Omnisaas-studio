@@ -21,7 +21,7 @@ const FrameLessSide = ({ children }: CommonProps) => {
         <LayoutBase
             adaptiveCardActive
             type={LAYOUT_FRAMELESS_SIDE}
-            className="app-layout-frameless-side flex flex-auto flex-col bg-gray-950"
+            className="app-layout-frameless-side flex flex-auto flex-col bg-[radial-gradient(125%_125%_at_50%_100%,_#000000_40%,_#010133_100%)]"
             pageContainerReassemble={({
                 pageContainerType,
                 pageBackgroundType,

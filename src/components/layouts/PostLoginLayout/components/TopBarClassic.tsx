@@ -14,7 +14,7 @@ const TopBarClassic = ({ children }: CommonProps) => {
     return (
         <LayoutBase
             type={LAYOUT_TOP_BAR_CLASSIC}
-            className="app-layout-top-bar-classic flex flex-auto flex-col min-h-screen"
+            className="app-layout-top-bar-classic flex flex-auto flex-col min-h-screen bg-[radial-gradient(125%_125%_at_50%_100%,_#000000_40%,_#010133_100%)]"
         >
             <div className="flex flex-auto min-w-0">
                 <div className="flex flex-col flex-auto min-h-screen min-w-0 relative w-full">
