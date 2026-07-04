@@ -1,149 +1,257 @@
 import React, { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import clinicWorkflowTemplate from '@/assets/templates/clinic-attendant-workflow.json'
+import { getAdminPlatformSettings } from '@/services/AdminPlatformSettingsService'
+import { useSessionUser } from '@/store/authStore'
+import { createClinicAgent } from '@/services/AgentService'
+import type {
+    AgentLifecycleStatus,
+    ClinicAttendantInput,
+    RagMemory,
+} from '@/@types/agents'
 
 type WizardStep = 0 | 1 | 2 | 3
 
-type InputType =
-    | 'WhatsApp'
-    | 'Chat Web'
-    | 'Documento'
-    | 'Áudio'
-    | 'JSON'
-    | 'Imagem'
-    | 'HTML'
-    | 'Vídeo'
-    | 'Sem entrada'
+const steps = ['Template', 'WhatsApp', 'IA e RAGs', 'Revisao']
 
-type OutputChannel =
-    | 'Chat'
-    | 'Webhook'
-    | 'E-mail'
-    | 'Google Drive'
-    | 'OneDrive'
-    | 'Dropbox'
-    | 'Arquivos internos'
-    | ''
+const defaultPrompt = `Voce e o atendente virtual oficial da clinica.
 
-type AgentStatus = 'Ativo' | 'Inativo' | 'Programado'
+Objetivos:
+- acolher pacientes com clareza;
+- responder apenas com informacoes autorizadas;
+- coletar dados apenas quando necessario;
+- encaminhar para humano quando houver urgencia, duvida clinica ou necessidade operacional.
 
-const inputTypes: InputType[] = [
-    'WhatsApp',
-    'Chat Web',
-    'Documento',
-    'Áudio',
-    'JSON',
-    'Imagem',
-    'HTML',
-    'Vídeo',
-    'Sem entrada',
-]
+Regras:
+- seja cordial, profissional e direto;
+- nao invente medicos, horarios, convenios ou procedimentos;
+- se nao houver certeza, informe que o caso sera encaminhado;
+- quando o caso precisar de humano, finalize usando a tag correta.`
 
-const outputGroups = {
-    Saída: ['Chat', 'Webhook', 'E-mail'] as OutputChannel[],
-    Nuvem: ['Google Drive', 'OneDrive', 'Dropbox'] as OutputChannel[],
-    Plataforma: ['Arquivos internos'] as OutputChannel[],
+const formatDate = (value: string) => {
+    return new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    }).format(new Date(value))
 }
 
-const steps = ['Entrada', 'Configuração', 'Saída', 'Revisão']
-
 const CreateAgent: React.FC = () => {
-    const [activeStep, setActiveStep] = useState<WizardStep>(0)
-    const [selectedInput, setSelectedInput] = useState<InputType>('WhatsApp')
-    const [selectedOutput, setSelectedOutput] =
-        useState<OutputChannel>('Chat')
-    const [agentName, setAgentName] = useState('')
-    const [agentDescription, setAgentDescription] = useState('')
-    const [agentNameTouched, setAgentNameTouched] = useState(false)
-    const [availableTags, setAvailableTags] = useState<string[]>([
-        'Suporte',
-        'Financeiro',
-        'Vendas',
-    ])
-    const [selectedTags, setSelectedTags] = useState<string[]>([])
-    const [tagDraft, setTagDraft] = useState('')
-    const [selectedModel, setSelectedModel] = useState('ChatGPT 4')
-    const [agentStatus, setAgentStatus] = useState<AgentStatus>('Ativo')
-    const [temperature, setTemperature] = useState(0.6)
-    const [accuracy, setAccuracy] = useState(0.8)
-    const [speed, setSpeed] = useState(0.7)
-    const [costControl, setCostControl] = useState(0.4)
-    const [knowledgeBaseEnabled, setKnowledgeBaseEnabled] = useState(true)
-    const [webAccessEnabled, setWebAccessEnabled] = useState(false)
-    const [toolExecutionEnabled, setToolExecutionEnabled] = useState(true)
     const navigate = useNavigate()
+    const user = useSessionUser((state) => state.user)
+    const adminSettings = useMemo(() => getAdminPlatformSettings(), [])
+    const [activeStep, setActiveStep] = useState<WizardStep>(0)
+    const [saving, setSaving] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
 
-    const stepDescriptions = useMemo(
-        () => [
-            'Selecione o tipo de entrada para iniciar o fluxo do agente.',
-            'Defina o comportamento inteligente e os controles do agente.',
-            'Escolha os canais de saída onde os resultados serão entregues.',
-            'Revise a configuração e confirme a criação do agente.',
-        ],
-        []
+    const [name, setName] = useState('')
+    const [clinicName, setClinicName] = useState('')
+    const [description, setDescription] = useState('')
+    const [status, setStatus] = useState<AgentLifecycleStatus>('Ativo')
+    const [tagDraft, setTagDraft] = useState('')
+    const [tags, setTags] = useState<string[]>([
+        'Clinica',
+        'WhatsApp',
+        'Atendente',
+    ])
+
+    const [instanceId, setInstanceId] = useState('')
+    const [instanceToken, setInstanceToken] = useState('')
+    const [clientToken, setClientToken] = useState('')
+
+    const [model, setModel] = useState('gpt-4o-mini')
+    const [systemPrompt, setSystemPrompt] = useState(defaultPrompt)
+    const [handoffMessage, setHandoffMessage] = useState(
+        'Em breve o time da clinica dara continuidade ao atendimento.',
     )
+    const [memoryWindow, setMemoryWindow] = useState(10)
+    const [errorTagId, setErrorTagId] = useState('1')
+    const [handoffTagId, setHandoffTagId] = useState('2')
+    const [supportTagId, setSupportTagId] = useState('3')
+    const [ragDraftTitle, setRagDraftTitle] = useState('')
+    const [ragDraftContent, setRagDraftContent] = useState('')
+    const [ragMemories, setRagMemories] = useState<RagMemory[]>([])
 
-    const handleNextStep = () => {
-        if (activeStep === 1 && agentName.trim().length === 0) {
-            setAgentNameTouched(true)
+    const currentUserLabel = user.userName || user.email || 'usuario atual'
+    const workflowStats = useMemo(() => {
+        const nodeCount = Array.isArray(clinicWorkflowTemplate.nodes)
+            ? clinicWorkflowTemplate.nodes.length
+            : 0
+
+        const connectionCount = clinicWorkflowTemplate.connections
+            ? Object.keys(clinicWorkflowTemplate.connections).length
+            : 0
+
+        return {
+            nodeCount,
+            connectionCount,
+        }
+    }, [])
+
+    const requiredStepOneFields = [
+        name.trim(),
+        clinicName.trim(),
+        description.trim(),
+    ]
+
+    const requiredStepTwoFields = [
+        instanceId.trim(),
+        instanceToken.trim(),
+        clientToken.trim(),
+    ]
+
+    const requiredStepThreeFields = [
+        systemPrompt.trim(),
+        handoffMessage.trim(),
+        errorTagId.trim(),
+        handoffTagId.trim(),
+        supportTagId.trim(),
+    ]
+
+    const handleNext = () => {
+        setErrorMessage('')
+
+        if (activeStep === 0 && requiredStepOneFields.some((value) => !value)) {
+            setErrorMessage(
+                'Preencha nome, clinica e descricao antes de continuar.',
+            )
             return
         }
-        setActiveStep((current) =>
-            current < steps.length - 1
-                ? ((current + 1) as WizardStep)
-                : current
+
+        if (activeStep === 1 && requiredStepTwoFields.some((value) => !value)) {
+            setErrorMessage(
+                'Complete os dados de conexao do WhatsApp para continuar.',
+            )
+            return
+        }
+
+        if (
+            activeStep === 2 &&
+            requiredStepThreeFields.some((value) => !value)
+        ) {
+            setErrorMessage(
+                'Defina prompt, mensagem de handoff e o mapeamento de tags.',
+            )
+            return
+        }
+
+        setActiveStep((currentStep) =>
+            currentStep < 3 ? ((currentStep + 1) as WizardStep) : currentStep,
         )
     }
 
-    const handlePreviousStep = () => {
-        setActiveStep((current) =>
-            current > 0 ? ((current - 1) as WizardStep) : current
-        )
-    }
-
-    const handleOutputSelect = (channel: OutputChannel) => {
-        setSelectedOutput(channel)
-    }
-
-    const handleTagToggle = (tag: string) => {
-        setSelectedTags((current) =>
-            current.includes(tag)
-                ? current.filter((item) => item !== tag)
-                : [...current, tag]
+    const handlePrevious = () => {
+        setErrorMessage('')
+        setActiveStep((currentStep) =>
+            currentStep > 0 ? ((currentStep - 1) as WizardStep) : currentStep,
         )
     }
 
     const handleAddTag = () => {
         const nextTag = tagDraft.trim()
+
         if (!nextTag) {
             return
         }
-        setAvailableTags((current) =>
-            current.includes(nextTag) ? current : [...current, nextTag]
-        )
-        setSelectedTags((current) =>
-            current.includes(nextTag) ? current : [...current, nextTag]
+
+        setTags((currentTags) =>
+            currentTags.includes(nextTag)
+                ? currentTags
+                : [...currentTags, nextTag],
         )
         setTagDraft('')
     }
 
-    const handleSaveAgent = () => {
-        navigate('/agentes')
+    const handleRemoveTag = (tag: string) => {
+        setTags((currentTags) => currentTags.filter((item) => item !== tag))
     }
+
+    const handleAddRagMemory = () => {
+        const nextTitle = ragDraftTitle.trim()
+        const nextContent = ragDraftContent.trim()
+
+        if (!nextTitle || !nextContent) {
+            return
+        }
+
+        setRagMemories((currentMemories) => [
+            ...currentMemories,
+            {
+                id: `${Date.now()}`,
+                title: nextTitle,
+                content: nextContent,
+            },
+        ])
+        setRagDraftTitle('')
+        setRagDraftContent('')
+    }
+
+    const handleRemoveRagMemory = (memoryId: string) => {
+        setRagMemories((currentMemories) =>
+            currentMemories.filter((memory) => memory.id !== memoryId),
+        )
+    }
+
+    const buildPayload = (): ClinicAttendantInput => ({
+        name: name.trim(),
+        clinicName: clinicName.trim(),
+        description: description.trim(),
+        status,
+        tags,
+        whatsapp: {
+            provider: 'z-api',
+            instanceId: instanceId.trim(),
+            instanceToken: instanceToken.trim(),
+            clientToken: clientToken.trim(),
+        },
+        intelligence: {
+            model,
+            systemPrompt: systemPrompt.trim(),
+            handoffMessage: handoffMessage.trim(),
+            memoryWindow,
+            tagMapping: {
+                errorTagId: errorTagId.trim(),
+                handoffTagId: handoffTagId.trim(),
+                supportTagId: supportTagId.trim(),
+            },
+            ragMemories,
+        },
+    })
+
+    const handleSave = async () => {
+        setSaving(true)
+        setErrorMessage('')
+
+        try {
+            const payload = buildPayload()
+            await createClinicAgent(payload, user)
+            navigate('/agentes')
+        } catch {
+            setErrorMessage(
+                'Nao foi possivel salvar o agente agora. Revise os dados e tente novamente.',
+            )
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const reviewPayload = buildPayload()
 
     return (
         <div className="flex flex-col gap-6">
-            <header className="flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+            <header className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p className="text-xs font-semibold uppercase text-indigo-500 dark:text-indigo-300">
-                            OmniStudio
+                            studio.IA
                         </p>
                         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                            Criar novo agente
+                            Criar atendente para clinica
                         </h1>
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            Jornada guiada em quatro passos para configurar o
-                            agente.
+                        <p className="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-400">
+                            Esta jornada configura um fluxo n8n baseado no
+                            template de WhatsApp, sem alterar a estrutura do
+                            workflow. O usuario final define apenas conexao
+                            WhatsApp, prompt, memorias e regras do atendente.
                         </p>
                     </div>
                     <Link
@@ -154,119 +262,144 @@ const CreateAgent: React.FC = () => {
                     </Link>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-6 grid gap-3 md:grid-cols-4">
                     {steps.map((step, index) => (
                         <div
                             key={step}
-                            className={`flex min-w-[180px] flex-1 items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium ${
+                            className={`rounded-xl border px-4 py-3 text-sm font-medium ${
                                 activeStep === index
                                     ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-200'
                                     : 'border-gray-200 text-gray-600 dark:border-gray-800 dark:text-gray-300'
                             }`}
                         >
-                            <span>{step}</span>
-                            <span className="text-xs text-gray-400 dark:text-gray-500">
-                                {index + 1}/4
-                            </span>
+                            <div className="flex items-center justify-between">
+                                <span>{step}</span>
+                                <span className="text-xs text-gray-400">
+                                    {index + 1}/4
+                                </span>
+                            </div>
                         </div>
                     ))}
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {stepDescriptions[activeStep]}
-                </p>
             </header>
 
             {activeStep === 0 && (
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        Entrada
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Escolha o tipo de entrada que dará início ao agente.
-                    </p>
-                    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {inputTypes.map((type) => (
-                            <button
-                                key={type}
-                                type="button"
-                                onClick={() => setSelectedInput(type)}
-                                className={`rounded-xl border px-4 py-6 text-center text-sm font-semibold transition ${
-                                    selectedInput === type
-                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-200'
-                                        : 'border-gray-200 text-gray-600 hover:border-indigo-300 dark:border-gray-800 dark:text-gray-300 dark:hover:border-indigo-400'
-                                }`}
-                            >
-                                {type}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-            )}
-
-            {activeStep === 1 && (
-                <div className="grid gap-6">
-                    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                            Identidade do agente
+                            Template do agente
                         </h2>
                         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                            Defina o nome, a descrição e as tags principais.
+                            Hoje a plataforma esta preparada para criar
+                            atendentes de clinica sobre um fluxo n8n travado,
+                            com infraestrutura administrada pela plataforma.
                         </p>
-                        <div className="mt-6 grid gap-4">
-                            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Nome do agente
+
+                        <div className="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 className="text-base font-semibold text-indigo-700 dark:text-indigo-200">
+                                        Atendente para clinica
+                                    </h3>
+                                    <p className="mt-2 text-sm text-indigo-700/80 dark:text-indigo-200/80">
+                                        Fluxo com entrada por WhatsApp, memoria,
+                                        agente de IA, tools e roteamento de
+                                        resposta. A logica do workflow permanece
+                                        fixa; so as configuracoes funcionais do
+                                        atendente mudam.
+                                    </p>
+                                </div>
+                                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-200">
+                                    Selecionado
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 grid gap-4 md:grid-cols-2">
+                            <Field required label="Nome do atendente">
                                 <input
-                                    value={agentName}
-                                    onChange={(event) =>
-                                        setAgentName(event.target.value)
-                                    }
-                                    onBlur={() => setAgentNameTouched(true)}
+                                    value={name}
                                     className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                                    placeholder="Ex.: Assistente de Suporte"
-                                    required
-                                />
-                                {agentNameTouched && agentName.trim().length === 0 && (
-                                    <span className="text-xs font-medium text-rose-500 dark:text-rose-300">
-                                        Informe o nome do agente para continuar.
-                                    </span>
-                                )}
-                            </label>
-                            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Descrição
-                                <textarea
-                                    value={agentDescription}
+                                    placeholder="Ex.: Recepcao Clinica Aurora"
                                     onChange={(event) =>
-                                        setAgentDescription(event.target.value)
+                                        setName(event.target.value)
                                     }
-                                    className="min-h-[90px] rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                                    placeholder="Descreva o foco e o objetivo do agente."
                                 />
-                            </label>
-                            <div className="grid gap-3">
+                            </Field>
+
+                            <Field required label="Nome da clinica">
+                                <input
+                                    value={clinicName}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="Ex.: Clinica Aurora"
+                                    onChange={(event) =>
+                                        setClinicName(event.target.value)
+                                    }
+                                />
+                            </Field>
+
+                            <Field label="Status inicial">
+                                <select
+                                    value={status}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    onChange={(event) =>
+                                        setStatus(
+                                            event.target.value as AgentLifecycleStatus,
+                                        )
+                                    }
+                                >
+                                    <option value="Ativo">Ativo</option>
+                                    <option value="Inativo">Inativo</option>
+                                    <option value="Programado">
+                                        Programado
+                                    </option>
+                                </select>
+                            </Field>
+
+                            <Field label="Usuario dono">
+                                <div className="rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
+                                    {currentUserLabel}
+                                </div>
+                            </Field>
+                        </div>
+
+                        <div className="mt-4">
+                            <Field required label="Descricao do atendente">
+                                <textarea
+                                    value={description}
+                                    className="min-h-[100px] rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="Descreva o papel desse atendente na operacao da clinica."
+                                    onChange={(event) =>
+                                        setDescription(event.target.value)
+                                    }
+                                />
+                            </Field>
+                        </div>
+
+                        <div className="mt-4">
+                            <Field label="Tags da plataforma">
                                 <div className="flex flex-wrap gap-2">
-                                    {availableTags.map((tag) => (
+                                    {tags.map((tag) => (
                                         <button
                                             key={tag}
                                             type="button"
-                                            onClick={() => handleTagToggle(tag)}
-                                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                                                selectedTags.includes(tag)
-                                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-200'
-                                                    : 'border-gray-200 text-gray-600 hover:border-indigo-300 dark:border-gray-800 dark:text-gray-300 dark:hover:border-indigo-400'
-                                            }`}
+                                            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200"
+                                            onClick={() =>
+                                                handleRemoveTag(tag)
+                                            }
                                         >
-                                            {tag}
+                                            {tag} x
                                         </button>
                                     ))}
                                 </div>
-                                <div className="flex flex-wrap gap-2">
+                                <div className="mt-3 flex gap-2">
                                     <input
                                         value={tagDraft}
+                                        className="flex-1 rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                        placeholder="Nova tag"
                                         onChange={(event) =>
                                             setTagDraft(event.target.value)
                                         }
-                                        className="flex-1 rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                                        placeholder="Digite uma tag e pressione adicionar"
                                         onKeyDown={(event) => {
                                             if (event.key === 'Enter') {
                                                 event.preventDefault()
@@ -276,289 +409,413 @@ const CreateAgent: React.FC = () => {
                                     />
                                     <button
                                         type="button"
-                                        onClick={handleAddTag}
                                         className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                                        onClick={handleAddTag}
                                     >
-                                        Adicionar tag
+                                        Adicionar
                                     </button>
                                 </div>
-                            </div>
+                            </Field>
+                        </div>
+                    </div>
+
+                    <aside className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            Resumo tecnico do template
+                        </h2>
+                        <div className="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                            <InfoRow
+                                label="Nos do workflow"
+                                value={`${workflowStats.nodeCount}`}
+                            />
+                            <InfoRow
+                                label="Conexoes"
+                                value={`${workflowStats.connectionCount}`}
+                            />
+                            <InfoRow
+                                label="Canal principal"
+                                value="WhatsApp / Z-API"
+                            />
+                            <InfoRow
+                                label="Memoria"
+                                value="Buffer configuravel"
+                            />
+                            <InfoRow
+                                label="Provisionamento"
+                                value="Backend da plataforma"
+                            />
+                        </div>
+                        <div className="mt-5 rounded-xl border border-dashed border-gray-300 p-4 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                            Redis, OpenAI, pasta do n8n, projeto e workflow de
+                            tool agora sao tratados como configuracao
+                            administrativa da plataforma, e nao mais como dados
+                            do usuario final.
+                        </div>
+                    </aside>
+                </section>
+            )}
+
+            {activeStep === 1 && (
+                <div className="grid gap-6">
+                    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            Conexao WhatsApp
+                        </h2>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            Esses dados alimentam os nodes HTTP do fluxo sem
+                            alterar a logica do template.
+                        </p>
+                        <div className="mt-6 grid gap-4 md:grid-cols-3">
+                            <Field required label="Z-API Instance ID">
+                                <input
+                                    value={instanceId}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="3EDEA..."
+                                    onChange={(event) =>
+                                        setInstanceId(event.target.value)
+                                    }
+                                />
+                            </Field>
+
+                            <Field required label="Z-API Instance Token">
+                                <input
+                                    value={instanceToken}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="token da instancia"
+                                    onChange={(event) =>
+                                        setInstanceToken(event.target.value)
+                                    }
+                                />
+                            </Field>
+
+                            <Field required label="Z-API Client Token">
+                                <input
+                                    value={clientToken}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="client-token"
+                                    onChange={(event) =>
+                                        setClientToken(event.target.value)
+                                    }
+                                />
+                            </Field>
                         </div>
                     </section>
 
                     <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                            Processamento
+                            Infraestrutura administrada pela plataforma
                         </h2>
                         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                            Defina o comportamento do agente antes de continuar.
+                            Cada atendente gera um novo workflow, mas os dados
+                            de n8n, Redis e credenciais tecnicas ficam fora do
+                            formulario do cliente e virao de um perfil
+                            administrativo no futuro.
                         </p>
-                        <div className="mt-6 grid gap-4">
-                            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Prompt principal
-                                <textarea
-                                    className="min-h-[120px] rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                                    placeholder="Ex.: Você é um agente especialista em suporte..."
-                                />
-                            </label>
-                            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Modelo de LLM
-                                <select
-                                    value={selectedModel}
-                                    onChange={(event) =>
-                                        setSelectedModel(event.target.value)
-                                    }
-                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                                >
-                                    <option value="ChatGPT 3.5">
-                                        ChatGPT 3.5
-                                    </option>
-                                    <option value="ChatGPT 4">ChatGPT 4</option>
-                                    <option value="Claude">Claude</option>
-                                    <option value="Grok">Grok</option>
-                                </select>
-                            </label>
-                            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Regras adicionais
-                                <textarea
-                                    className="min-h-[90px] rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                                    placeholder="Ex.: Responda de forma objetiva e registre logs."
-                                />
-                            </label>
-
-                            <div className="grid gap-3 md:grid-cols-3">
-                                <ToggleCard
-                                    label="Uso de base de conhecimento"
-                                    description="Aumenta a precisão usando documentos internos."
-                                    checked={knowledgeBaseEnabled}
-                                    onChange={setKnowledgeBaseEnabled}
-                                />
-                                <ToggleCard
-                                    label="Acesso à web"
-                                    description="Permite buscar fontes externas."
-                                    checked={webAccessEnabled}
-                                    onChange={setWebAccessEnabled}
-                                />
-                                <ToggleCard
-                                    label="Execução de ferramentas"
-                                    description="Integrações e automações disponíveis."
-                                    checked={toolExecutionEnabled}
-                                    onChange={setToolExecutionEnabled}
-                                />
-                            </div>
-
-                            {knowledgeBaseEnabled && (
-                                <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                        Base de conhecimento
-                                    </h3>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        Anexe arquivos para treinar o agente com
-                                        conteúdo interno.
-                                    </p>
-                                    <label className="mt-4 flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Arquivos
-                                        <input
-                                            type="file"
-                                            multiple
-                                            className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                                        />
-                                    </label>
-                                </div>
-                            )}
-
-                            <div className="grid gap-4 lg:grid-cols-2">
-                                <SliderControl
-                                    label="Criatividade"
-                                    value={temperature}
-                                    onChange={setTemperature}
-                                />
-                                <SliderControl
-                                    label="Precisão"
-                                    value={accuracy}
-                                    onChange={setAccuracy}
-                                />
-                                <SliderControl
-                                    label="Velocidade"
-                                    value={speed}
-                                    onChange={setSpeed}
-                                />
-                                <SliderControl
-                                    label="Controle de custo"
-                                    value={costControl}
-                                    onChange={setCostControl}
-                                />
-                            </div>
+                        <div className="mt-6 grid gap-4 md:grid-cols-2">
+                            <InfoPanel
+                                label="Pasta n8n"
+                                value={adminSettings.n8n.folderId}
+                            />
+                            <InfoPanel
+                                label="Project n8n"
+                                value={adminSettings.n8n.projectId}
+                            />
+                            <InfoPanel
+                                label="Workflow da tool"
+                                value={adminSettings.n8n.guideWorkflowId}
+                            />
+                            <InfoPanel
+                                label="Publicacao automatica"
+                                value={
+                                    adminSettings.n8n.publishOnCreate
+                                        ? 'Ativa'
+                                        : 'Desligada'
+                                }
+                            />
                         </div>
                     </section>
                 </div>
             )}
 
             {activeStep === 2 && (
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        Saída
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Selecione os canais de saída para entregar os resultados.
-                    </p>
-                    <div className="mt-6 grid gap-6">
-                        {Object.entries(outputGroups).map(([group, channels]) => (
-                            <div key={group}>
-                                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                    {group}
-                                </h3>
-                                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                    {channels.map((channel) => (
-                                        <button
-                                            key={channel}
-                                            type="button"
-                                            onClick={() =>
-                                                handleOutputSelect(channel)
-                                            }
-                                            className={`rounded-xl border px-4 py-6 text-center text-sm font-semibold transition ${
-                                                selectedOutput === channel
-                                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-200'
-                                                    : 'border-gray-200 text-gray-600 hover:border-indigo-300 dark:border-gray-800 dark:text-gray-300 dark:hover:border-indigo-400'
-                                            }`}
-                                        >
-                                            {channel}
-                                        </button>
-                                    ))}
-                                </div>
+                <div className="grid gap-6">
+                    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            Inteligencia do atendente
+                        </h2>
+                        <div className="mt-6 grid gap-4 md:grid-cols-2">
+                            <Field label="Modelo">
+                                <select
+                                    value={model}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    onChange={(event) =>
+                                        setModel(event.target.value)
+                                    }
+                                >
+                                    <option value="gpt-4o-mini">
+                                        gpt-4o-mini
+                                    </option>
+                                    <option value="gpt-4.1-mini">
+                                        gpt-4.1-mini
+                                    </option>
+                                    <option value="gpt-4o">gpt-4o</option>
+                                </select>
+                            </Field>
+
+                            <Field label="Janela de memoria">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={memoryWindow}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    onChange={(event) =>
+                                        setMemoryWindow(
+                                            Number(event.target.value),
+                                        )
+                                    }
+                                />
+                            </Field>
+                        </div>
+
+                        <div className="mt-4">
+                            <Field required label="Prompt principal">
+                                <textarea
+                                    value={systemPrompt}
+                                    className="min-h-[260px] rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="Instrucao completa do atendente"
+                                    onChange={(event) =>
+                                        setSystemPrompt(event.target.value)
+                                    }
+                                />
+                            </Field>
+                        </div>
+
+                        <div className="mt-4">
+                            <Field
+                                required
+                                label="Mensagem de handoff humano"
+                            >
+                                <input
+                                    value={handoffMessage}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="Mensagem enviada antes do encaminhamento"
+                                    onChange={(event) =>
+                                        setHandoffMessage(
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                            </Field>
+                        </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            Mapeamento de tags
+                        </h2>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            O prompt usa essas tags para acionar o node de
+                            handoff no WhatsApp.
+                        </p>
+                        <div className="mt-6 grid gap-4 md:grid-cols-3">
+                            <Field required label="Tag de erro">
+                                <input
+                                    value={errorTagId}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    onChange={(event) =>
+                                        setErrorTagId(event.target.value)
+                                    }
+                                />
+                            </Field>
+
+                            <Field required label="Tag de handoff">
+                                <input
+                                    value={handoffTagId}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    onChange={(event) =>
+                                        setHandoffTagId(event.target.value)
+                                    }
+                                />
+                            </Field>
+
+                            <Field required label="Tag de suporte">
+                                <input
+                                    value={supportTagId}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    onChange={(event) =>
+                                        setSupportTagId(event.target.value)
+                                    }
+                                />
+                            </Field>
+                        </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            RAGs e memorias
+                        </h2>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            Cada memoria adicionada entra no contexto do prompt
+                            final enviado ao workflow.
+                        </p>
+
+                        <div className="mt-6 grid gap-4">
+                            <Field label="Titulo da memoria">
+                                <input
+                                    value={ragDraftTitle}
+                                    className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="Ex.: Politica de agendamento"
+                                    onChange={(event) =>
+                                        setRagDraftTitle(
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                            </Field>
+
+                            <Field label="Conteudo da memoria">
+                                <textarea
+                                    value={ragDraftContent}
+                                    className="min-h-[110px] rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
+                                    placeholder="Texto base que a IA podera usar no atendimento."
+                                    onChange={(event) =>
+                                        setRagDraftContent(
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                            </Field>
+
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                                    onClick={handleAddRagMemory}
+                                >
+                                    Adicionar memoria
+                                </button>
                             </div>
-                        ))}
-                    </div>
-                </section>
+                        </div>
+
+                        <div className="mt-6 grid gap-3">
+                            {ragMemories.length === 0 && (
+                                <div className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                                    Nenhuma memoria adicionada ainda.
+                                </div>
+                            )}
+
+                            {ragMemories.map((memory) => (
+                                <div
+                                    key={memory.id}
+                                    className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950"
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                {memory.title}
+                                            </h3>
+                                            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-300">
+                                                {memory.content}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-300 dark:border-rose-500/30 dark:text-rose-300"
+                                            onClick={() =>
+                                                handleRemoveRagMemory(
+                                                    memory.id,
+                                                )
+                                            }
+                                        >
+                                            Remover
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </div>
             )}
 
             {activeStep === 3 && (
                 <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        Revisão da configuração
+                        Revisao final
                     </h2>
                     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Verifique os detalhes selecionados antes de salvar o
-                        agente.
+                        O workflow sera criado a partir do template higienizado e
+                        recebera apenas os dados abaixo como configuracao.
                     </p>
+
                     <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                Entrada selecionada
-                            </h3>
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                {selectedInput}
-                            </p>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                Identidade do agente
-                            </h3>
-                            <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                                <p>
-                                    Nome:{' '}
-                                    {agentName
-                                        ? agentName
-                                        : 'Não informado'}
-                                </p>
-                                <p>
-                                    Descrição:{' '}
-                                    {agentDescription
-                                        ? agentDescription
-                                        : 'Não informada'}
-                                </p>
-                                <p>
-                                    Tags:{' '}
-                                    {selectedTags.length > 0
-                                        ? selectedTags.join(', ')
-                                        : 'Nenhuma tag selecionada'}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                Modelo selecionado
-                            </h3>
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                {selectedModel}
-                            </p>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                Canais de saída
-                            </h3>
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                {selectedOutput
-                                    ? selectedOutput
-                                    : 'Nenhum canal selecionado'}
-                            </p>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                Status do agente
-                            </h3>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Defina como o agente ficará disponível após
-                                salvar.
-                            </p>
-                            <select
-                                value={agentStatus}
-                                onChange={(event) =>
-                                    setAgentStatus(
-                                        event.target.value as AgentStatus
-                                    )
-                                }
-                                className="mt-3 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:text-gray-100"
-                            >
-                                <option value="Ativo">Ativo</option>
-                                <option value="Inativo">Inativo</option>
-                                <option value="Programado">Programado</option>
-                            </select>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                Recursos habilitados
-                            </h3>
-                            <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                                <li>
-                                    Base de conhecimento:{' '}
-                                    {knowledgeBaseEnabled ? 'Ativa' : 'Inativa'}
-                                </li>
-                                <li>
-                                    Acesso à web:{' '}
-                                    {webAccessEnabled ? 'Ativo' : 'Inativo'}
-                                </li>
-                                <li>
-                                    Execução de ferramentas:{' '}
-                                    {toolExecutionEnabled ? 'Ativa' : 'Inativa'}
-                                </li>
-                            </ul>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                Ajustes do agente
-                            </h3>
-                            <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                                <li>
-                                    Criatividade:{' '}
-                                    {(temperature * 100).toFixed(0)}%
-                                </li>
-                                <li>
-                                    Precisão:{' '}
-                                    {(accuracy * 100).toFixed(0)}%
-                                </li>
-                                <li>
-                                    Velocidade:{' '}
-                                    {(speed * 100).toFixed(0)}%
-                                </li>
-                                <li>
-                                    Controle de custo:{' '}
-                                    {(costControl * 100).toFixed(0)}%
-                                </li>
-                            </ul>
+                        <ReviewCard
+                            title="Identidade"
+                            lines={[
+                                `Atendente: ${reviewPayload.name}`,
+                                `Clinica: ${reviewPayload.clinicName}`,
+                                `Status: ${reviewPayload.status}`,
+                                `Tags: ${reviewPayload.tags.join(', ')}`,
+                            ]}
+                        />
+                        <ReviewCard
+                            title="WhatsApp"
+                            lines={[
+                                'Provider: Z-API',
+                                `Instance ID: ${reviewPayload.whatsapp.instanceId}`,
+                                `Provisionado pela plataforma para ${reviewPayload.clinicName}`,
+                            ]}
+                        />
+                        <ReviewCard
+                            title="Infraestrutura"
+                            lines={[
+                                `Pasta n8n: ${adminSettings.n8n.folderId}`,
+                                `Projeto n8n: ${adminSettings.n8n.projectId}`,
+                                `Tool workflow: ${adminSettings.n8n.guideWorkflowId}`,
+                                `Publicar ao criar: ${
+                                    adminSettings.n8n.publishOnCreate
+                                        ? 'sim'
+                                        : 'nao'
+                                }`,
+                            ]}
+                        />
+                        <ReviewCard
+                            title="IA"
+                            lines={[
+                                `Modelo: ${reviewPayload.intelligence.model}`,
+                                `Memoria: ${reviewPayload.intelligence.memoryWindow}`,
+                                `RAGs: ${reviewPayload.intelligence.ragMemories.length}`,
+                                `Mensagem de handoff: ${reviewPayload.intelligence.handoffMessage}`,
+                            ]}
+                        />
+                    </div>
+
+                    <div className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            Preview do payload
+                        </h3>
+                        <div className="mt-3 grid gap-2 text-sm text-gray-600 dark:text-gray-300">
+                            <InfoRow
+                                label="Nome do workflow"
+                                value={reviewPayload.name}
+                            />
+                            <InfoRow
+                                label="Total de nos"
+                                value={`${workflowStats.nodeCount}`}
+                            />
+                            <InfoRow
+                                label="Criado em"
+                                value={formatDate(new Date().toISOString())}
+                            />
                         </div>
                     </div>
                 </section>
+            )}
+
+            {errorMessage && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+                    {errorMessage}
+                </div>
             )}
 
             <footer className="flex flex-wrap items-center justify-end gap-3">
@@ -570,27 +827,30 @@ const CreateAgent: React.FC = () => {
                 </Link>
                 <button
                     type="button"
-                    onClick={handlePreviousStep}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-indigo-300 dark:border-gray-700 dark:text-gray-300 dark:hover:border-indigo-400"
-                    disabled={activeStep === 0}
+                    disabled={activeStep === 0 || saving}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-indigo-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:border-indigo-400"
+                    onClick={handlePrevious}
                 >
                     Voltar
                 </button>
-                <button
-                    type="button"
-                    onClick={handleNextStep}
-                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                    disabled={activeStep === 3}
-                >
-                    Avançar
-                </button>
+                {activeStep < 3 && (
+                    <button
+                        type="button"
+                        disabled={saving}
+                        className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                        onClick={handleNext}
+                    >
+                        Avancar
+                    </button>
+                )}
                 {activeStep === 3 && (
                     <button
                         type="button"
-                        onClick={handleSaveAgent}
-                        className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                        disabled={saving}
+                        className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                        onClick={handleSave}
                     >
-                        Salvar agente
+                        {saving ? 'Salvando...' : 'Salvar atendente'}
                     </button>
                 )}
             </footer>
@@ -598,63 +858,65 @@ const CreateAgent: React.FC = () => {
     )
 }
 
-type ToggleCardProps = {
+type FieldProps = {
     label: string
-    description: string
-    checked: boolean
-    onChange: (checked: boolean) => void
+    required?: boolean
+    children: React.ReactNode
 }
 
-const ToggleCard = ({
-    label,
-    description,
-    checked,
-    onChange,
-}: ToggleCardProps) => {
+const Field = ({ label, required = false, children }: FieldProps) => {
     return (
-        <div className="rounded-xl border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
-            <div className="flex items-center gap-2">
-                <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-indigo-500"
-                    checked={checked}
-                    onChange={(event) => onChange(event.target.checked)}
-                />
-                <span className="font-semibold text-gray-700 dark:text-gray-200">
-                    {label}
-                </span>
-            </div>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                {description}
+        <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span>
+                {label}
+                {required ? ' *' : ''}
+            </span>
+            {children}
+        </label>
+    )
+}
+
+const InfoRow = ({ label, value }: { label: string; value: string }) => {
+    return (
+        <div className="flex items-center justify-between gap-4">
+            <span className="text-gray-500 dark:text-gray-400">{label}</span>
+            <span className="text-right font-medium text-gray-900 dark:text-gray-100">
+                {value}
+            </span>
+        </div>
+    )
+}
+
+const InfoPanel = ({ label, value }: { label: string; value: string }) => {
+    return (
+        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {label}
+            </p>
+            <p className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                {value}
             </p>
         </div>
     )
 }
 
-type SliderControlProps = {
-    label: string
-    value: number
-    onChange: (value: number) => void
-}
-
-const SliderControl = ({ label, value, onChange }: SliderControlProps) => {
+const ReviewCard = ({
+    title,
+    lines,
+}: {
+    title: string
+    lines: string[]
+}) => {
     return (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
-            <div className="flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-200">
-                <span>{label}</span>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {(value * 100).toFixed(0)}%
-                </span>
+        <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {title}
+            </h3>
+            <div className="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                {lines.map((line) => (
+                    <p key={line}>{line}</p>
+                ))}
             </div>
-            <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={value}
-                onChange={(event) => onChange(Number(event.target.value))}
-                className="mt-3 w-full accent-indigo-500"
-            />
         </div>
     )
 }

@@ -5,7 +5,7 @@ import ColorBends from './ColorBends'
 
 const typingPhrases = [
     'Crie seus agentes de IA que executam processos, de forma simples.',
-    'Automatize, Reduza, Integre e Escale com IA',
+    'Automatize, reduza, integre e escale com IA.',
 ]
 
 const MainView: React.FC = () => {
@@ -61,22 +61,21 @@ const MainView: React.FC = () => {
             </div>
             <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-6 text-center">
                 <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-                    Bem-vindo(a) ao OmniSaaS Studio IA
+                    Bem-vindo(a) ao studio.IA
                 </span>
                 <h1 className="mt-6 min-h-[3.75em] text-4xl font-semibold leading-tight text-white sm:text-5xl">
                     {typedText}
                 </h1>
                 <p className="mt-4 text-base text-white/70 sm:text-lg">
-                    Escolha um caminho para começar: criar um Agente, Bibliotecas de agentes já criados ou
-                    acompanhar seus resultados.
+                    Escolha um caminho para comecar: criar um agente, explorar bibliotecas prontas ou acompanhar seus resultados.
                 </p>
                 <div className="mt-10 grid w-full gap-4 sm:grid-cols-3">
                     <Link
                         to="/criaragente"
                         className="group rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-white/0 p-6 text-left shadow-[0_12px_40px_rgba(16,0,43,0.35)] backdrop-blur transition hover:-translate-y-1 hover:border-white/30 hover:from-white/15 hover:via-white/10"
                     >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg text-white/80">
-                            ✨
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold uppercase text-white/80">
+                            IA
                         </div>
                         <h2 className="mt-4 text-lg font-semibold text-white">
                             Criar agentes
@@ -89,25 +88,25 @@ const MainView: React.FC = () => {
                         to="/Biblioteca"
                         className="group rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-white/0 p-6 text-left shadow-[0_12px_40px_rgba(16,0,43,0.35)] backdrop-blur transition hover:-translate-y-1 hover:border-white/30 hover:from-white/15 hover:via-white/10"
                     >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg text-white/80">
-                            📚
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold uppercase text-white/80">
+                            Lib
                         </div>
                         <h2 className="mt-4 text-lg font-semibold text-white">
                             Biblioteca
                         </h2>
                         <p className="mt-2 text-sm text-white/70">
-                            Explore agentes prontos para implantar integrações.
+                            Explore agentes prontos para implantar integracoes.
                         </p>
                     </Link>
                     <Link
                         to="/agentes"
                         className="group rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-white/0 p-6 text-left shadow-[0_12px_40px_rgba(16,0,43,0.35)] backdrop-blur transition hover:-translate-y-1 hover:border-white/30 hover:from-white/15 hover:via-white/10"
                     >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg text-white/80">
-                            🤖
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold uppercase text-white/80">
+                            Ops
                         </div>
                         <h2 className="mt-4 text-lg font-semibold text-white">
-                            Meus Agentes
+                            Meus agentes
                         </h2>
                         <p className="mt-2 text-sm text-white/70">
                             Gerencie seus agentes ativos e acompanhe resultados.

@@ -1,0 +1,716 @@
+import type { AgentCatalogItem, AgentLibraryCategory } from '@/@types/agents'
+
+export const libraryCategoryGroups = [
+    {
+        id: 'departamentos',
+        label: 'Departamentos',
+        description:
+            'Agentes para operacoes centrais e times internos de uma empresa.',
+        categories: [
+            'marketing',
+            'comercial',
+            'atendimento',
+            'financeiro',
+            'fiscal',
+            'administrativo',
+            'rh',
+            'logistica',
+            'compras',
+            'ti',
+        ],
+    },
+    {
+        id: 'especialidades',
+        label: 'Especialidades',
+        description:
+            'Areas especificas com necessidades e fluxos mais especializados.',
+        categories: ['juridico', 'engenharia'],
+    },
+] as const satisfies Array<{
+    id: string
+    label: string
+    description: string
+    categories: AgentLibraryCategory[]
+}>
+
+export const libraryCategories: Array<{
+    value: AgentLibraryCategory
+    label: string
+    description: string
+}> = [
+    {
+        value: 'marketing',
+        label: 'Marketing',
+        description: 'Campanhas, inbound, conteudo e relacionamento com leads.',
+    },
+    {
+        value: 'comercial',
+        label: 'Comercial',
+        description: 'Prospeccao, follow-up, pipeline e conversao de oportunidades.',
+    },
+    {
+        value: 'atendimento',
+        label: 'Atendimento',
+        description: 'Suporte ao cliente, triagem inicial e resolucao de demandas.',
+    },
+    {
+        value: 'financeiro',
+        label: 'Financeiro',
+        description: 'Cobranca, conciliacao, alertas e operacoes financeiras.',
+    },
+    {
+        value: 'fiscal',
+        label: 'Fiscal',
+        description: 'Documentos fiscais, alertas de obrigacoes e suporte tributario operacional.',
+    },
+    {
+        value: 'administrativo',
+        label: 'Administrativo',
+        description: 'Rotinas internas, organizacao de demandas e apoio operacional.',
+    },
+    {
+        value: 'rh',
+        label: 'RH',
+        description: 'Recrutamento, onboarding e suporte interno a pessoas.',
+    },
+    {
+        value: 'logistica',
+        label: 'Logistica',
+        description: 'Roteirizacao, status operacional e comunicacao de entrega.',
+    },
+    {
+        value: 'compras',
+        label: 'Compras',
+        description: 'Cotacoes, fornecedores e acompanhamento do processo de aquisicao.',
+    },
+    {
+        value: 'ti',
+        label: 'TI',
+        description: 'Service desk, suporte interno e organizacao de chamados.',
+    },
+    {
+        value: 'juridico',
+        label: 'Juridico',
+        description: 'Triagem, contratos, compliance e analise documental.',
+    },
+    {
+        value: 'engenharia',
+        label: 'Engenharia',
+        description: 'Documentacao tecnica, suporte de projeto e operacao especializada.',
+    },
+]
+
+export const agentCatalog: AgentCatalogItem[] = [
+    {
+        id: 'marketing-inbound-sdr',
+        category: 'marketing',
+        title: 'SDR Inbound',
+        role: 'Qualificacao de leads',
+        description:
+            'Recebe leads de campanhas, qualifica o interesse e conduz a passagem para o time comercial.',
+        highlights: ['Inbound', 'Qualificacao', 'Passagem comercial'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#34d399',
+            glow: '#0f766e',
+            panel: '#0d1f1d',
+            symbol: 'SD',
+        },
+    },
+    {
+        id: 'marketing-content-curator',
+        category: 'marketing',
+        title: 'Curador de conteudo',
+        role: 'Apoio editorial',
+        description:
+            'Organiza pautas, reaproveita materiais e ajuda a manter a esteira de conteudo ativa.',
+        highlights: ['Conteudo', 'Pautas', 'Calendario'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#fb923c',
+            glow: '#9a3412',
+            panel: '#22120a',
+            symbol: 'CT',
+        },
+    },
+    {
+        id: 'marketing-campaign-analyst',
+        category: 'marketing',
+        title: 'Analista de campanha',
+        role: 'Performance e acompanhamento',
+        description:
+            'Monitora execucao de campanhas e resume sinais importantes para o time de marketing.',
+        highlights: ['Campanhas', 'Resumo', 'Sinais de performance'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#f59e0b',
+            glow: '#92400e',
+            panel: '#24160a',
+            symbol: 'MK',
+        },
+    },
+    {
+        id: 'finance-billing-agent',
+        category: 'financeiro',
+        title: 'Cobranca inteligente',
+        role: 'Cobranca e follow-up',
+        description:
+            'Acompanha vencimentos, envia lembretes e organiza o contato com clientes inadimplentes.',
+        highlights: ['Cobranca', 'Lembretes', 'Status de pagamento'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#60a5fa',
+            glow: '#1d4ed8',
+            panel: '#091a2f',
+            symbol: 'CB',
+        },
+    },
+    {
+        id: 'finance-reconciliation-agent',
+        category: 'financeiro',
+        title: 'Conciliador financeiro',
+        role: 'Operacao financeira',
+        description:
+            'Consolida movimentacoes e ajuda a sinalizar divergencias para revisao do time.',
+        highlights: ['Conciliacao', 'Divergencias', 'Conferencia'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#c084fc',
+            glow: '#7e22ce',
+            panel: '#1d1029',
+            symbol: 'FN',
+        },
+    },
+    {
+        id: 'finance-report-assistant',
+        category: 'financeiro',
+        title: 'Assistente de relatorios',
+        role: 'Resumo gerencial',
+        description:
+            'Prepara resumos operacionais e apoia a leitura rapida de indicadores financeiros.',
+        highlights: ['Relatorios', 'Indicadores', 'Resumo executivo'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#22d3ee',
+            glow: '#0e7490',
+            panel: '#0b1c23',
+            symbol: 'RL',
+        },
+    },
+    {
+        id: 'commercial-outbound-agent',
+        category: 'comercial',
+        title: 'BDR outbound',
+        role: 'Prospeccao ativa',
+        description:
+            'Dispara abordagens iniciais, organiza listas de prospeccao e ajuda a abrir novas conversas comerciais.',
+        highlights: ['Outbound', 'Prospeccao', 'Cadencia'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#fb7185',
+            glow: '#9f1239',
+            panel: '#231019',
+            symbol: 'BD',
+        },
+    },
+    {
+        id: 'commercial-followup-agent',
+        category: 'comercial',
+        title: 'Follow-up comercial',
+        role: 'Acompanhamento de propostas',
+        description:
+            'Reforca contatos, acompanha negociações em aberto e ajuda o time a nao perder timing comercial.',
+        highlights: ['Follow-up', 'Propostas', 'Pipeline'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#f59e0b',
+            glow: '#92400e',
+            panel: '#24160a',
+            symbol: 'FP',
+        },
+    },
+    {
+        id: 'commercial-qualification-agent',
+        category: 'comercial',
+        title: 'Qualificador de leads',
+        role: 'Pré-venda',
+        description:
+            'Conduz perguntas-chave, identifica aderencia e prepara a passagem do lead para o consultor.',
+        highlights: ['Leads', 'Qualificacao', 'Passagem'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#22d3ee',
+            glow: '#0e7490',
+            panel: '#0b1c23',
+            symbol: 'QL',
+        },
+    },
+    {
+        id: 'support-whatsapp-agent',
+        category: 'atendimento',
+        title: 'Atendente WhatsApp',
+        role: 'Atendimento ao cliente',
+        description:
+            'Recebe duvidas, organiza o primeiro atendimento e direciona casos mais sensiveis para a equipe.',
+        highlights: ['WhatsApp', 'Triagem', 'Encaminhamento'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#34d399',
+            glow: '#0f766e',
+            panel: '#0d1f1d',
+            symbol: 'WA',
+        },
+    },
+    {
+        id: 'support-helpdesk-agent',
+        category: 'atendimento',
+        title: 'Triagem de suporte',
+        role: 'Classificacao de chamados',
+        description:
+            'Classifica chamados, identifica prioridade e organiza o repasse para o time responsavel.',
+        highlights: ['Suporte', 'Prioridade', 'Chamados'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#60a5fa',
+            glow: '#1d4ed8',
+            panel: '#091a2f',
+            symbol: 'SP',
+        },
+    },
+    {
+        id: 'support-csat-agent',
+        category: 'atendimento',
+        title: 'Pos-atendimento',
+        role: 'Qualidade e CSAT',
+        description:
+            'Coleta feedback apos o atendimento e ajuda a medir a satisfacao do cliente.',
+        highlights: ['CSAT', 'Feedback', 'Qualidade'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#2dd4bf',
+            glow: '#0f766e',
+            panel: '#0b1d1b',
+            symbol: 'CS',
+        },
+    },
+    {
+        id: 'fiscal-document-agent',
+        category: 'fiscal',
+        title: 'Leitor fiscal',
+        role: 'Suporte documental',
+        description:
+            'Ajuda a organizar notas, documentos e pendencias de rotina fiscal para o time interno.',
+        highlights: ['Notas', 'Documentos', 'Pendencias'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#c084fc',
+            glow: '#7e22ce',
+            panel: '#1d1029',
+            symbol: 'FS',
+        },
+    },
+    {
+        id: 'fiscal-obligation-agent',
+        category: 'fiscal',
+        title: 'Monitor de obrigacoes',
+        role: 'Alertas operacionais',
+        description:
+            'Lembra vencimentos, etapas e obrigacoes recorrentes para reduzir risco operacional no calendario fiscal.',
+        highlights: ['Obrigacoes', 'Prazos', 'Alertas'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#f87171',
+            glow: '#991b1b',
+            panel: '#261012',
+            symbol: 'OB',
+        },
+    },
+    {
+        id: 'fiscal-validation-agent',
+        category: 'fiscal',
+        title: 'Validador de cadastro',
+        role: 'Conferencia inicial',
+        description:
+            'Apoia a conferencia de dados cadastrais e documentos antes da entrada no fluxo fiscal.',
+        highlights: ['Cadastro', 'Conferencia', 'Validacao'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#fbbf24',
+            glow: '#b45309',
+            panel: '#251707',
+            symbol: 'VC',
+        },
+    },
+    {
+        id: 'admin-scheduler-agent',
+        category: 'administrativo',
+        title: 'Agendador interno',
+        role: 'Rotina administrativa',
+        description:
+            'Coordena compromissos, confirma agendas e ajuda a organizar a rotina operacional do escritorio.',
+        highlights: ['Agenda', 'Confirmacoes', 'Rotina'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#67e8f9',
+            glow: '#0e7490',
+            panel: '#0a1d24',
+            symbol: 'AG',
+        },
+    },
+    {
+        id: 'admin-demand-agent',
+        category: 'administrativo',
+        title: 'Organizador de demandas',
+        role: 'Backoffice',
+        description:
+            'Recebe solicitacoes internas, categoriza prioridades e distribui a demanda para o responsavel correto.',
+        highlights: ['Backoffice', 'Solicitacoes', 'Distribuicao'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#a78bfa',
+            glow: '#6d28d9',
+            panel: '#18112a',
+            symbol: 'DM',
+        },
+    },
+    {
+        id: 'admin-protocol-agent',
+        category: 'administrativo',
+        title: 'Controlador de protocolos',
+        role: 'Documentacao interna',
+        description:
+            'Acompanha entradas, saidas e atualizacoes de processos administrativos com mais rastreabilidade.',
+        highlights: ['Protocolos', 'Controle', 'Rastreabilidade'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#38bdf8',
+            glow: '#0369a1',
+            panel: '#081c28',
+            symbol: 'PR',
+        },
+    },
+    {
+        id: 'rh-recruiter-assistant',
+        category: 'rh',
+        title: 'Triagem de candidatos',
+        role: 'Recrutamento',
+        description:
+            'Ajuda a organizar perfis, perguntas iniciais e priorizacao de candidatos.',
+        highlights: ['Triagem', 'Candidatos', 'Priorizacao'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#f87171',
+            glow: '#991b1b',
+            panel: '#261012',
+            symbol: 'RH',
+        },
+    },
+    {
+        id: 'rh-onboarding-agent',
+        category: 'rh',
+        title: 'Onboarding interno',
+        role: 'Integracao de colaboradores',
+        description:
+            'Conduz boas-vindas, organiza passos iniciais e reforca informacoes importantes para novos colaboradores.',
+        highlights: ['Onboarding', 'Boas-vindas', 'Checklist'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#fbbf24',
+            glow: '#b45309',
+            panel: '#251707',
+            symbol: 'ON',
+        },
+    },
+    {
+        id: 'rh-helpdesk-agent',
+        category: 'rh',
+        title: 'Atendente de RH',
+        role: 'Suporte interno',
+        description:
+            'Responde duvidas frequentes de politicas internas e direciona demandas para o time correto.',
+        highlights: ['FAQ interno', 'Politicas', 'Encaminhamento'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#a78bfa',
+            glow: '#6d28d9',
+            panel: '#18112a',
+            symbol: 'HP',
+        },
+    },
+    {
+        id: 'logistics-status-agent',
+        category: 'logistica',
+        title: 'Status de entregas',
+        role: 'Comunicacao operacional',
+        description:
+            'Atualiza clientes e equipes sobre etapas logisticas e ocorrencias no percurso.',
+        highlights: ['Entregas', 'Atualizacao', 'Ocorrencias'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#2dd4bf',
+            glow: '#0f766e',
+            panel: '#0b1d1b',
+            symbol: 'LG',
+        },
+    },
+    {
+        id: 'logistics-route-agent',
+        category: 'logistica',
+        title: 'Coordenador de rotas',
+        role: 'Planejamento operacional',
+        description:
+            'Apoia a leitura de prioridades e a distribuicao de rotas com mais clareza para a operacao.',
+        highlights: ['Rotas', 'Prioridades', 'Distribuicao'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#38bdf8',
+            glow: '#0369a1',
+            panel: '#081c28',
+            symbol: 'RT',
+        },
+    },
+    {
+        id: 'logistics-sla-agent',
+        category: 'logistica',
+        title: 'Monitor de SLA',
+        role: 'Acompanhamento de prazo',
+        description:
+            'Sinaliza atrasos e ajuda a antecipar riscos operacionais antes que impactem o cliente.',
+        highlights: ['SLA', 'Atrasos', 'Alertas'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#10b981',
+            glow: '#047857',
+            panel: '#0b1c17',
+            symbol: 'SL',
+        },
+    },
+    {
+        id: 'procurement-quotation-agent',
+        category: 'compras',
+        title: 'Gestor de cotacoes',
+        role: 'Cotacao e comparacao',
+        description:
+            'Organiza pedidos de cotacao, resume respostas de fornecedores e facilita comparacoes iniciais.',
+        highlights: ['Cotacoes', 'Fornecedores', 'Comparacao'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#22c55e',
+            glow: '#166534',
+            panel: '#0b1b13',
+            symbol: 'CQ',
+        },
+    },
+    {
+        id: 'procurement-supplier-agent',
+        category: 'compras',
+        title: 'Relacionamento com fornecedor',
+        role: 'Gestao de fornecedores',
+        description:
+            'Mantem o contato operacional com fornecedores e ajuda a acompanhar pendencias de compras.',
+        highlights: ['Fornecedor', 'Pendencias', 'Acompanhamento'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#10b981',
+            glow: '#047857',
+            panel: '#0b1c17',
+            symbol: 'FR',
+        },
+    },
+    {
+        id: 'procurement-replenishment-agent',
+        category: 'compras',
+        title: 'Reposicao de estoque',
+        role: 'Abastecimento',
+        description:
+            'Sinaliza necessidade de reposicao e ajuda o time de compras a agir antes da ruptura.',
+        highlights: ['Estoque', 'Reposicao', 'Abastecimento'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#fb923c',
+            glow: '#9a3412',
+            panel: '#22120a',
+            symbol: 'RP',
+        },
+    },
+    {
+        id: 'it-helpdesk-agent',
+        category: 'ti',
+        title: 'Service desk interno',
+        role: 'Atendimento de TI',
+        description:
+            'Recebe chamados, coleta contexto tecnico e direciona incidentes para a fila correta.',
+        highlights: ['Chamados', 'Incidentes', 'TI interno'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#60a5fa',
+            glow: '#1d4ed8',
+            panel: '#091a2f',
+            symbol: 'TI',
+        },
+    },
+    {
+        id: 'it-access-agent',
+        category: 'ti',
+        title: 'Gestor de acessos',
+        role: 'Solicitacoes internas',
+        description:
+            'Apoia pedidos de acesso, organizacao de permissoes e triagem de necessidades recorrentes do time.',
+        highlights: ['Acessos', 'Permissoes', 'Solicitacoes'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#22d3ee',
+            glow: '#0e7490',
+            panel: '#0b1c23',
+            symbol: 'AC',
+        },
+    },
+    {
+        id: 'it-monitoring-agent',
+        category: 'ti',
+        title: 'Monitor de incidentes',
+        role: 'Operacao tecnica',
+        description:
+            'Consolida sinais de indisponibilidade e ajuda a acelerar o entendimento inicial de incidentes.',
+        highlights: ['Incidentes', 'Monitoramento', 'Alertas'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#f59e0b',
+            glow: '#92400e',
+            panel: '#24160a',
+            symbol: 'MN',
+        },
+    },
+    {
+        id: 'legal-contract-reviewer',
+        category: 'juridico',
+        title: 'Revisor de contrato',
+        role: 'Analise documental',
+        description:
+            'Apoia a revisao inicial de clausulas, riscos e inconsistencias em contratos padrao.',
+        highlights: ['Revisao inicial', 'Clausulas', 'Sinalizacao de risco'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#f87171',
+            glow: '#991b1b',
+            panel: '#261012',
+            symbol: 'RC',
+        },
+    },
+    {
+        id: 'legal-contract-creator',
+        category: 'juridico',
+        title: 'Criador de contrato',
+        role: 'Minutas padronizadas',
+        description:
+            'Monta a primeira versao de contratos recorrentes com base em dados e regras predefinidas.',
+        highlights: ['Minutas', 'Padronizacao', 'Preenchimento guiado'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#fbbf24',
+            glow: '#b45309',
+            panel: '#251707',
+            symbol: 'CC',
+        },
+    },
+    {
+        id: 'legal-intake',
+        category: 'juridico',
+        title: 'Triagem juridica',
+        role: 'Intake de casos',
+        description:
+            'Coleta contexto do cliente, identifica o tema juridico e organiza a entrada do atendimento.',
+        highlights: ['Intake', 'Coleta de contexto', 'Direcionamento'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#a78bfa',
+            glow: '#6d28d9',
+            panel: '#18112a',
+            symbol: 'TJ',
+        },
+    },
+    {
+        id: 'engineering-site-agent',
+        category: 'engenharia',
+        title: 'Coordenador de obra',
+        role: 'Operacao de campo',
+        description:
+            'Centraliza comunicacoes de obra, tarefas do dia e alertas de acompanhamento de execucao.',
+        highlights: ['Obra', 'Campo', 'Acompanhamento'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#fb7185',
+            glow: '#9f1239',
+            panel: '#241018',
+            symbol: 'OB',
+        },
+    },
+    {
+        id: 'engineering-support-agent',
+        category: 'engenharia',
+        title: 'Suporte tecnico',
+        role: 'Atendimento especializado',
+        description:
+            'Orienta duvidas tecnicas iniciais e ajuda a distribuir a demanda para o especialista adequado.',
+        highlights: ['Tecnico', 'Triagem', 'Distribuicao'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#67e8f9',
+            glow: '#0e7490',
+            panel: '#0a1d24',
+            symbol: 'ST',
+        },
+    },
+    {
+        id: 'engineering-document-agent',
+        category: 'engenharia',
+        title: 'Leitor de memoriais',
+        role: 'Documentacao tecnica',
+        description:
+            'Resume memoriais, especificacoes e documentos de projeto para facilitar a consulta operacional.',
+        highlights: ['Memoriais', 'Resumo', 'Projeto'],
+        route: '/criaragente',
+        available: false,
+        visual: {
+            accent: '#22c55e',
+            glow: '#166534',
+            panel: '#0b1b13',
+            symbol: 'DG',
+        },
+    },
+]

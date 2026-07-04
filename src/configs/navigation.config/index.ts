@@ -1,5 +1,4 @@
 import {
-    NAV_ITEM_TYPE_TITLE,
     NAV_ITEM_TYPE_ITEM,
     NAV_ITEM_TYPE_COLLAPSE,
     NAV_ITEM_TYPE_DIVIDER
@@ -11,7 +10,7 @@ const navigationConfig: NavigationTree[] = [
     {
         key: 'ai-platform',
         path: '',
-        title: 'Studio IA',
+        title: 'studio.IA',
         translateKey: 'nav.aiPlatform',
         icon: 'groupMenu',
         type: NAV_ITEM_TYPE_COLLAPSE,
@@ -32,16 +31,6 @@ const navigationConfig: NavigationTree[] = [
                 path: '/agentes',
                 title: 'Agentes',
                 translateKey: 'nav.aiPlatform.agents',
-                icon: 'pi',
-                type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
-                subMenu: [],
-            },
-            {
-                key: 'ai-platform.triggers',
-                path: '/gatilhos',
-                title: 'Gatilhos',
-                translateKey: 'nav.aiPlatform.triggers',
                 icon: 'pi',
                 type: NAV_ITEM_TYPE_ITEM,
                 authority: [],

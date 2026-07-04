@@ -1,13 +1,9 @@
 import Menu from '@/components/ui/Menu'
 import ScrollBar from '@/components/ui/ScrollBar'
 import { useSettingsStore } from '../store/settingsStore'
-import useQuery from '@/utils/hooks/useQuery'
 import {
-    TbUserSquare,
-    TbLock,
-    TbBell,
     TbFileDollar,
-    TbRefreshDot,
+    TbUserSquare,
 } from 'react-icons/tb'
 import type { View } from '../types'
 import type { ReactNode } from 'react'
@@ -15,19 +11,16 @@ import type { ReactNode } from 'react'
 const { MenuItem } = Menu
 
 const menuList: { label: string; value: View; icon: ReactNode }[] = [
-    { label: 'Perfil', value: 'profile', icon: <TbUserSquare /> },
-    { label: 'Segurança', value: 'security', icon: <TbLock /> },
-    { label: 'Notificação', value: 'notification', icon: <TbBell /> },
-    { label: 'Pagamento', value: 'billing', icon: <TbFileDollar /> },
-    { label: 'Integração', value: 'integration', icon: <TbRefreshDot /> },
+    { label: 'Dados pessoais', value: 'profile', icon: <TbUserSquare /> },
+    {
+        label: 'Pagamento e assinaturas',
+        value: 'billing',
+        icon: <TbFileDollar />,
+    },
 ]
 
 export const SettingsMenu = ({ onChange }: { onChange?: () => void }) => {
-    const query = useQuery()
-
     const { currentView, setCurrentView } = useSettingsStore()
-
-    const currentPath = query.get('category') || query.get('label') || 'inbox'
 
     const handleSelect = (value: View) => {
         setCurrentView(value)
@@ -35,7 +28,7 @@ export const SettingsMenu = ({ onChange }: { onChange?: () => void }) => {
     }
 
     return (
-        <div className="flex flex-col justify-between h-full">
+        <div className="flex h-full flex-col justify-between">
             <ScrollBar className="h-full overflow-y-auto">
                 <Menu className="mx-2 mb-10">
                     {menuList.map((menu) => (
@@ -47,7 +40,7 @@ export const SettingsMenu = ({ onChange }: { onChange?: () => void }) => {
                                     ? 'bg-gray-100 dark:bg-gray-700'
                                     : ''
                             }`}
-                            isActive={currentPath === menu.value}
+                            isActive={currentView === menu.value}
                             onSelect={() => handleSelect(menu.value)}
                         >
                             <span className="text-2xl ltr:mr-2 rtl:ml-2">

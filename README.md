@@ -1,1 +1,1 @@
-# Coluna-Ajustada
+# studio.IA
