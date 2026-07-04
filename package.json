@@ -11,7 +11,8 @@
     "prettier:fix": "npm run prettier -- --write",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "npm run lint -- --fix",
-    "format": "npm run prettier:fix && npm run lint:fix"
+    "format": "npm run prettier:fix && npm run lint:fix",
+    "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "@floating-ui/react": "^0.26.23",
@@ -99,6 +100,7 @@
     "eslint-plugin-react": "^7.35.2",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.11",
+    "gh-pages": "^6.3.0",
     "postcss": "^8.4.45",
     "postcss-nesting": "^13.0.0",
     "prettier": "^3.3.3",
