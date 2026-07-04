@@ -1,283 +1,380 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
-import Tag from '@/components/ui/Tag'
-import Avatar from '@/components/ui/Avatar'
-import Notification from '@/components/ui/Notification'
-import toast from '@/components/ui/toast'
-import CreditCardDialog from '@/components/view/CreditCardDialog'
-import BillingHistory from './BillingHistory'
-import { apiGetSettingsBilling } from '@/services/AccontsService'
-import classNames from '@/utils/classNames'
-import isLastChild from '@/utils/isLastChild'
-import sleep from '@/utils/sleep'
-import { TbPlus } from 'react-icons/tb'
-import useSWR from 'swr'
-import dayjs from 'dayjs'
-import { useNavigate } from 'react-router-dom'
-import { PiLightningFill } from 'react-icons/pi'
-import { NumericFormat } from 'react-number-format'
+import Input from '@/components/ui/Input'
+import {
+    DEPARTMENT_MONTHLY_PRICE,
+    getActiveSubscriptionCount,
+    getClientAccountSettings,
+    getMonthlyRecurringRevenue,
+    isDepartmentSubscribed,
+    saveClientPaymentMethod,
+    setDepartmentSubscriptionStatus,
+} from '@/services/ClientAccountService'
+import { useSessionUser } from '@/store/authStore'
+import {
+    getLibraryCategories,
+    getLibraryCategoryGroups,
+} from '@/services/AdminCatalogService'
 
-import type {
-    GetSettingsBillingResponse,
-    CreditCard,
-    CreditCardInfo,
-} from '../types'
-
-const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-]
+type PaymentFormState = {
+    brand: string
+    holderName: string
+    last4: string
+    expiryMonth: string
+    expiryYear: string
+    billingEmail: string
+}
 
 const SettingsBilling = () => {
-    const navigate = useNavigate()
-
-    const [selectedCard, setSelectedCard] = useState<{
-        type: 'NEW' | 'EDIT' | ''
-        dialogOpen: boolean
-        cardInfo: Partial<CreditCardInfo>
-    }>({
-        type: '',
-        dialogOpen: false,
-        cardInfo: {},
+    const user = useSessionUser((state) => state.user)
+    const libraryCategories = useMemo(() => getLibraryCategories(), [])
+    const libraryCategoryGroups = useMemo(() => getLibraryCategoryGroups(), [])
+    const [paymentForm, setPaymentForm] = useState<PaymentFormState>({
+        brand: 'Visa',
+        holderName: '',
+        last4: '',
+        expiryMonth: '',
+        expiryYear: '',
+        billingEmail: '',
     })
+    const [accountSettings, setAccountSettings] = useState(() =>
+        getClientAccountSettings(user),
+    )
+    const [savedMessage, setSavedMessage] = useState('')
 
-    const {
-        data = {
-            currentPlan: {
-                plan: '',
-                status: '',
-                billingCycle: '',
-                nextPaymentDate: null,
-                amount: null,
-            },
-            paymentMethods: [],
-            transactionHistory: [],
-        },
-    } = useSWR(
-        '/api/settings/billing/',
-        () => apiGetSettingsBilling<GetSettingsBillingResponse>(),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
+    useEffect(() => {
+        const settings = getClientAccountSettings(user)
+        setAccountSettings(settings)
+        setPaymentForm(settings.paymentMethod)
+    }, [user])
+
+    const monthlyTotal = useMemo(
+        () => getMonthlyRecurringRevenue(accountSettings),
+        [accountSettings],
     )
 
-    const handleEditCreditCard = (card: Partial<CreditCard>) => {
-        setSelectedCard({
-            type: 'EDIT',
-            dialogOpen: true,
-            cardInfo: card,
-        })
+    const activePlans = useMemo(
+        () => getActiveSubscriptionCount(accountSettings),
+        [accountSettings],
+    )
+
+    const hasPaymentMethod =
+        paymentForm.holderName.trim() &&
+        paymentForm.last4.trim() &&
+        paymentForm.expiryMonth.trim() &&
+        paymentForm.expiryYear.trim()
+
+    const refreshAccountSettings = () => {
+        setAccountSettings(getClientAccountSettings(user))
     }
 
-    const handleCreditCardDialogClose = () => {
-        setSelectedCard({
-            type: '',
-            dialogOpen: false,
-            cardInfo: {},
-        })
+    const handlePaymentChange = (
+        field: keyof PaymentFormState,
+        value: string,
+    ) => {
+        setPaymentForm((current) => ({
+            ...current,
+            [field]: value,
+        }))
+        setSavedMessage('')
     }
 
-    const handleEditCreditCardSubmit = async () => {
-        await sleep(500)
-        handleCreditCardDialogClose()
-        toast.push(
-            <Notification type="success">Credit card updated!</Notification>,
-            { placement: 'top-center' },
+    const handleSavePaymentMethod = () => {
+        saveClientPaymentMethod(user, paymentForm)
+        refreshAccountSettings()
+        setSavedMessage('Forma de pagamento atualizada com sucesso.')
+    }
+
+    const handleSubscriptionToggle = (
+        category: (typeof libraryCategories)[number],
+        subscribe: boolean,
+    ) => {
+        if (subscribe && !hasPaymentMethod) {
+            setSavedMessage(
+                'Cadastre uma forma de pagamento antes de contratar um departamento.',
+            )
+            return
+        }
+
+        setDepartmentSubscriptionStatus(
+            user,
+            category.value,
+            subscribe ? 'active' : 'inactive',
         )
-    }
-
-    const handleAddCreditCardSubmit = async (values: CreditCard) => {
-        console.log('Submitted values', values)
-        await sleep(500)
-        handleCreditCardDialogClose()
-        toast.push(
-            <Notification type="success">Credit card added!</Notification>,
-            { placement: 'top-center' },
+        refreshAccountSettings()
+        setSavedMessage(
+            subscribe
+                ? `${category.label} contratado por R$ ${DEPARTMENT_MONTHLY_PRICE},00/mensais.`
+                : `${category.label} removido da cobranca recorrente.`,
         )
-    }
-
-    const handleChangePlan = () => {
-        navigate('/concepts/account/pricing?subcription=basic&cycle=monthly')
     }
 
     return (
-        <div>
-            <h4 className="mb-4">Billing</h4>
-            <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div>
-                            <Avatar
-                                className="bg-emerald-500"
-                                shape="circle"
-                                icon={<PiLightningFill />}
-                            />
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h6 className="font-bold">
-                                    {data.currentPlan.plan}
-                                </h6>
-                                <Tag className="bg-success-subtle text-success rounded-md border-0">
-                                    <span className="capitalize">
-                                        {data.currentPlan.status}
-                                    </span>
-                                </Tag>
-                            </div>
-                            <div className="font-semibold">
-                                <span>
-                                    Billing {data.currentPlan.billingCycle}
-                                </span>
-                                <span> | </span>
-                                <span>
-                                    Next payment on{' '}
-                                    {dayjs
-                                        .unix(
-                                            (data.currentPlan
-                                                .nextPaymentDate as number) ||
-                                                0,
-                                        )
-                                        .format('MM/DD/YYYY')}
-                                </span>
-                                <span>
-                                    <span className="mx-1">for</span>
-                                    <NumericFormat
-                                        className="font-bold heading-text"
-                                        displayType="text"
-                                        value={(
-                                            Math.round(
-                                                (data.currentPlan.amount || 0) *
-                                                    100,
-                                            ) / 100
-                                        ).toFixed(2)}
-                                        prefix={'$'}
-                                        thousandSeparator={true}
-                                    />
-                                </span>
-                            </div>
-                        </div>
+        <div className="space-y-6">
+            <div>
+                <h4 className="mb-2">Pagamento e assinaturas</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Estruture a cobranca recorrente da conta e defina quais
+                    departamentos ficam liberados para configuracao.
+                </p>
+            </div>
+
+            <section className="grid gap-4 xl:grid-cols-3">
+                <SummaryCard
+                    label="Departamentos ativos"
+                    value={`${activePlans}`}
+                    helper="Categorias cobradas mensalmente nesta conta."
+                />
+                <SummaryCard
+                    label="Mensalidade recorrente"
+                    value={`R$ ${monthlyTotal.toFixed(2).replace('.', ',')}`}
+                    helper="Soma das assinaturas contratadas."
+                />
+                <SummaryCard
+                    label="Preco por departamento"
+                    value={`R$ ${DEPARTMENT_MONTHLY_PRICE},00`}
+                    helper="Modelo atual de cobranca fixa por area contratada."
+                />
+            </section>
+
+            <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="mb-4">
+                        <h5>Forma de pagamento</h5>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            Base simples para a cobranca recorrente do cliente
+                            final. Em producao real, isso deve ser integrado a
+                            um gateway como Stripe, Pagar.me ou Asaas.
+                        </p>
                     </div>
-                    <div className="flex">
-                        <Button
-                            size="sm"
-                            variant="solid"
-                            onClick={handleChangePlan}
-                        >
-                            Change plan
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Field label="Bandeira">
+                            <Input
+                                value={paymentForm.brand}
+                                placeholder="Visa"
+                                onChange={(event) =>
+                                    handlePaymentChange(
+                                        'brand',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                        <Field label="Titular do cartao">
+                            <Input
+                                value={paymentForm.holderName}
+                                placeholder="Nome impresso no cartao"
+                                onChange={(event) =>
+                                    handlePaymentChange(
+                                        'holderName',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                        <Field label="Ultimos 4 digitos">
+                            <Input
+                                value={paymentForm.last4}
+                                maxLength={4}
+                                placeholder="1234"
+                                onChange={(event) =>
+                                    handlePaymentChange(
+                                        'last4',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                        <Field label="E-mail de cobranca">
+                            <Input
+                                type="email"
+                                value={paymentForm.billingEmail}
+                                placeholder="financeiro@empresa.com"
+                                onChange={(event) =>
+                                    handlePaymentChange(
+                                        'billingEmail',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                        <Field label="Mes de expiracao">
+                            <Input
+                                value={paymentForm.expiryMonth}
+                                placeholder="08"
+                                onChange={(event) =>
+                                    handlePaymentChange(
+                                        'expiryMonth',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                        <Field label="Ano de expiracao">
+                            <Input
+                                value={paymentForm.expiryYear}
+                                placeholder="28"
+                                onChange={(event) =>
+                                    handlePaymentChange(
+                                        'expiryYear',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                    </div>
+
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                        {savedMessage ? (
+                            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-300">
+                                {savedMessage}
+                            </span>
+                        ) : (
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                                O cadastro local serve como simulacao comercial
+                                ate a integracao real com o gateway de pagamento.
+                            </span>
+                        )}
+                        <Button variant="solid" onClick={handleSavePaymentMethod}>
+                            Salvar forma de pagamento
                         </Button>
                     </div>
-                </div>
-            </div>
-            <div className="mt-8">
-                <h5>Payment method</h5>
-                <div>
-                    {data.paymentMethods?.map((card, index) => (
-                        <div
-                            key={card.cardId}
-                            className={classNames(
-                                'flex items-center justify-between p-4',
-                                !isLastChild(data.paymentMethods, index) &&
-                                    'border-b border-gray-200 dark:border-gray-600',
-                            )}
-                        >
-                            <div className="flex items-center">
-                                {card.cardType === 'VISA' && (
-                                    <img
-                                        src="/img/others/img-8.png"
-                                        alt="visa"
-                                    />
-                                )}
-                                {card.cardType === 'MASTER' && (
-                                    <img
-                                        src="/img/others/img-9.png"
-                                        alt="master"
-                                    />
-                                )}
-                                <div className="ml-3 rtl:mr-3">
-                                    <div className="flex items-center">
-                                        <div className="text-gray-900 dark:text-gray-100 font-semibold">
-                                            {card.cardHolderName} ••••{' '}
-                                            {card.last4Number}
-                                        </div>
-                                        {card.primary && (
-                                            <Tag className="bg-primary-subtle text-primary rounded-md border-0 mx-2">
-                                                <span className="capitalize">
-                                                    {' '}
-                                                    Primary{' '}
-                                                </span>
-                                            </Tag>
-                                        )}
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="mb-4">
+                        <h5>Assinaturas por departamento</h5>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            Ao contratar uma area, o cliente final passa a ter
+                            acesso ao conjunto de agentes daquele departamento na
+                            biblioteca.
+                        </p>
+                    </div>
+
+                    <div className="space-y-5">
+                        {libraryCategoryGroups.map((group) => (
+                            <div key={group.id}>
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                            {group.label}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {group.description}
+                                        </p>
                                     </div>
-                                    <span>
-                                        Expired{' '}
-                                        {months[parseInt(card.expMonth) - 1]} 20
-                                        {card.expYear}
-                                    </span>
+                                </div>
+
+                                <div className="grid gap-3">
+                                    {group.categories.map((categoryValue) => {
+                                        const category = libraryCategories.find(
+                                            (item) =>
+                                                item.value === categoryValue,
+                                        )
+
+                                        if (!category) {
+                                            return null
+                                        }
+
+                                        const subscribed =
+                                            isDepartmentSubscribed(
+                                                accountSettings,
+                                                category.value,
+                                            )
+
+                                        return (
+                                            <div
+                                                key={category.value}
+                                                className="flex flex-col gap-3 rounded-2xl border border-gray-200 p-4 dark:border-gray-800 dark:bg-gray-950 md:flex-row md:items-center md:justify-between"
+                                            >
+                                                <div>
+                                                    <div className="flex items-center gap-3">
+                                                        <h6 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                            {category.label}
+                                                        </h6>
+                                                        <span
+                                                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                                                subscribed
+                                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                                                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                                                            }`}
+                                                        >
+                                                            {subscribed
+                                                                ? 'Ativo'
+                                                                : 'Inativo'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                                        {category.description}
+                                                    </p>
+                                                    <p className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                        R$ {category.monthlyPrice}
+                                                        ,00 por mes
+                                                    </p>
+                                                </div>
+
+                                                <Button
+                                                    variant={
+                                                        subscribed
+                                                            ? 'default'
+                                                            : 'solid'
+                                                    }
+                                                    onClick={() =>
+                                                        handleSubscriptionToggle(
+                                                            category,
+                                                            !subscribed,
+                                                        )
+                                                    }
+                                                >
+                                                    {subscribed
+                                                        ? 'Cancelar assinatura'
+                                                        : 'Contratar departamento'}
+                                                </Button>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             </div>
-                            <div className="flex">
-                                <Button
-                                    size="sm"
-                                    type="button"
-                                    onClick={() => handleEditCreditCard(card)}
-                                >
-                                    Edit
-                                </Button>
-                            </div>
-                        </div>
-                    ))}
-                    <Button
-                        variant="plain"
-                        icon={<TbPlus />}
-                        onClick={() => {
-                            setSelectedCard({
-                                type: 'NEW',
-                                dialogOpen: true,
-                                cardInfo: {},
-                            })
-                        }}
-                    >
-                        Add payment method
-                    </Button>
-                </div>
+                        ))}
+                    </div>
+                </section>
             </div>
-            <div className="mt-8">
-                <h5>Transaction history</h5>
-                <BillingHistory
-                    className="mt-4"
-                    data={data.transactionHistory}
-                />
-            </div>
-            <CreditCardDialog
-                title={
-                    selectedCard.type === 'NEW'
-                        ? 'Add credit card'
-                        : 'Edit credit card'
-                }
-                defaultValues={selectedCard.cardInfo as CreditCard}
-                dialogOpen={selectedCard.dialogOpen}
-                onDialogClose={handleCreditCardDialogClose}
-                onSubmit={
-                    selectedCard.type === 'NEW'
-                        ? (values) =>
-                              handleAddCreditCardSubmit(values as CreditCard)
-                        : handleEditCreditCardSubmit
-                }
-            />
         </div>
     )
 }
+
+const Field = ({
+    label,
+    children,
+}: {
+    label: string
+    children: React.ReactNode
+}) => (
+    <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <span>{label}</span>
+        {children}
+    </label>
+)
+
+const SummaryCard = ({
+    label,
+    value,
+    helper,
+}: {
+    label: string
+    value: string
+    helper: string
+}) => (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+        <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            {value}
+        </p>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            {helper}
+        </p>
+    </div>
+)
 
 export default SettingsBilling

@@ -1,0 +1,1 @@
+const e=(c=10)=>{const n=[],o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",r=o.length,a=c;for(let t=0;t<a;t++)n[t]=o.charAt(Math.floor(Math.random()*r));return n.join("")};export{e as c};

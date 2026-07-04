@@ -57,7 +57,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         const redirectUrl = params.get(REDIRECT_URL_KEY)
 
         navigatorRef.current?.navigate(
-            redirectUrl ? redirectUrl : appConfig.authenticatedEntryPath,
+            redirectUrl ? redirectUrl : '/dashboard',
         )
     }
 

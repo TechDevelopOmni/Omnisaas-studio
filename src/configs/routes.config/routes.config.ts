@@ -54,14 +54,6 @@ export const protectedRoutes: Routes = [
         component: lazy(() => import('@/views/ai-platform/CreateAgent')),
         authority: [],
     },
-    {
-        key: 'triggerConfiguration',
-        path: '/gatilhos',
-        component: lazy(
-            () => import('@/views/ai-platform/TriggerConfiguration')
-        ),
-        authority: [],
-    },
     /** Example purpose only, please remove */
     {
         key: 'Cliente',
